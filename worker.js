@@ -1,136 +1,94 @@
 export default {
   async fetch(req, env) {
 
-    // 🔥 Safe CORS (no blocking)
     const headers = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Allow-Methods": "*"
     };
 
-    // Preflight
     if (req.method === "OPTIONS") {
       return new Response(null, { headers });
     }
 
     const url = new URL(req.url);
 
-    // ================= SIGNUP =================
+    // ========= SIGNUP =========
     if (url.pathname === "/signup") {
-      try {
-        let body = await req.text();
-        let data = {};
+      let data = JSON.parse(await req.text() || "{}");
 
-        try {
-          data = JSON.parse(body || "{}");
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: "invalid json" }), {
-            status: 400,
-            headers
-          });
-        }
+      const id = "user_" + Date.now();
 
-        const email = data.email;
-        const password = data.password;
+      await env.DB.prepare(
+        "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
+      ).bind(id, data.email, data.password, 30000).run();
 
-        if (!email || !password) {
-          return new Response(JSON.stringify({ ok: false, error: "missing data" }), {
-            status: 400,
-            headers
-          });
-        }
-
-        const id = "user_" + Date.now();
-
-        await env.DB.prepare(
-          "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
-        ).bind(id, email, password, 30000).run();
-
-        return new Response(JSON.stringify({ ok: true }), {
-          headers: { ...headers, "Content-Type": "application/json" }
-        });
-
-      } catch (e) {
-        return new Response(JSON.stringify({ ok: false, error: e.message }), {
-          status: 500,
-          headers
-        });
-      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
     }
 
-    // ================= LOGIN =================
+    // ========= LOGIN =========
     if (url.pathname === "/login") {
-      try {
-        let body = await req.text();
-        let data = {};
+      let data = JSON.parse(await req.text() || "{}");
 
-        try {
-          data = JSON.parse(body || "{}");
-        } catch (e) {
-          return new Response(JSON.stringify({ ok: false, error: "invalid json" }), {
-            status: 400,
-            headers
-          });
-        }
+      const user = await env.DB.prepare(
+        "SELECT * FROM users WHERE email=? AND password=?"
+      ).bind(data.email, data.password).first();
 
-        const email = data.email;
-        const password = data.password;
-
-        const user = await env.DB.prepare(
-          "SELECT * FROM users WHERE email = ? AND password = ?"
-        ).bind(email, password).first();
-
-        if (!user) {
-          return new Response(JSON.stringify({ ok: false }), {
-            status: 401,
-            headers
-          });
-        }
-
-        return new Response(JSON.stringify({
-          ok: true,
-          uid: user.id
-        }), {
-          headers: { ...headers, "Content-Type": "application/json" }
-        });
-
-      } catch (e) {
-        return new Response(JSON.stringify({ ok: false, error: e.message }), {
-          status: 500,
-          headers
-        });
+      if (!user) {
+        return new Response(JSON.stringify({ ok: false }), { headers });
       }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        uid: user.id
+      }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
     }
 
-    // ================= USER =================
+    // ========= USER =========
     if (url.pathname === "/user") {
-      try {
-        const uid = url.searchParams.get("uid");
+      const uid = url.searchParams.get("uid");
 
-        if (!uid) {
-          return new Response(JSON.stringify({ error: "no uid" }), {
-            status: 401,
-            headers
-          });
-        }
+      const user = await env.DB.prepare(
+        "SELECT id,email,credits FROM users WHERE id=?"
+      ).bind(uid).first();
 
-        const user = await env.DB.prepare(
-          "SELECT id, email, credits FROM users WHERE id = ?"
-        ).bind(uid).first();
-
-        return new Response(JSON.stringify({ user }), {
-          headers: { ...headers, "Content-Type": "application/json" }
-        });
-
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers
-        });
-      }
+      return new Response(JSON.stringify({ user }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
     }
 
-    // ================= DEFAULT =================
-    return new Response("MoraAI API running", { headers });
+    // ========= SAVE VOICE =========
+    if (url.pathname === "/save-voice") {
+      let data = JSON.parse(await req.text() || "{}");
+
+      const id = "voice_" + Date.now();
+
+      await env.DB.prepare(
+        "INSERT INTO voices (id, user_id, name, pth_base64) VALUES (?, ?, ?, ?)"
+      ).bind(id, data.uid, data.name, data.pth).run();
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
+    }
+
+    // ========= GET VOICES =========
+    if (url.pathname === "/voices") {
+      const uid = url.searchParams.get("uid");
+
+      const voices = await env.DB.prepare(
+        "SELECT id,name FROM voices WHERE user_id=?"
+      ).bind(uid).all();
+
+      return new Response(JSON.stringify({ voices }), {
+        headers: { ...headers, "Content-Type": "application/json" }
+      });
+    }
+
+    return new Response("MoraAI API", { headers });
   }
 };
