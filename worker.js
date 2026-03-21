@@ -1,7 +1,7 @@
 export default {
   async fetch(req, env) {
 
-    // 🔥 SIMPLE CORS (no blocking)
+    // 🔥 Safe CORS (no blocking)
     const headers = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
@@ -18,9 +18,21 @@ export default {
     // ================= SIGNUP =================
     if (url.pathname === "/signup") {
       try {
-        const { email, password } = await req.json();
+        let body = await req.text();
+        let data = {};
 
-        // validation
+        try {
+          data = JSON.parse(body || "{}");
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: "invalid json" }), {
+            status: 400,
+            headers
+          });
+        }
+
+        const email = data.email;
+        const password = data.password;
+
         if (!email || !password) {
           return new Response(JSON.stringify({ ok: false, error: "missing data" }), {
             status: 400,
@@ -49,7 +61,20 @@ export default {
     // ================= LOGIN =================
     if (url.pathname === "/login") {
       try {
-        const { email, password } = await req.json();
+        let body = await req.text();
+        let data = {};
+
+        try {
+          data = JSON.parse(body || "{}");
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: "invalid json" }), {
+            status: 400,
+            headers
+          });
+        }
+
+        const email = data.email;
+        const password = data.password;
 
         const user = await env.DB.prepare(
           "SELECT * FROM users WHERE email = ? AND password = ?"
