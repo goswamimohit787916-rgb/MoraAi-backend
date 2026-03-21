@@ -1,0 +1,13 @@
+name = "mora-api"
+main = "src/index.ts"
+compatibility_date = "2026-03-21"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mora_db"
+database_id = "YOUR_D1_DB_ID"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "mora-voices"
+
