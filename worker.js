@@ -2,7 +2,7 @@ export default {
   async fetch(req, env) {
 
     const headers = {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": "https://moraai.pages.dev/",
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Allow-Methods": "*",
       "Access-Control-Allow-Credentials": "true"
