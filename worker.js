@@ -1,14 +1,14 @@
 export default {
   async fetch(req, env) {
 
-    // 🔥 TEMP SAFE CORS (no credentials issues)
+    // 🔥 SIMPLE CORS (no blocking)
     const headers = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
       "Access-Control-Allow-Methods": "*"
     };
 
-    // CORS preflight
+    // Preflight
     if (req.method === "OPTIONS") {
       return new Response(null, { headers });
     }
@@ -20,18 +20,26 @@ export default {
       try {
         const { email, password } = await req.json();
 
+        // validation
+        if (!email || !password) {
+          return new Response(JSON.stringify({ ok: false, error: "missing data" }), {
+            status: 400,
+            headers
+          });
+        }
+
         const id = "user_" + Date.now();
 
         await env.DB.prepare(
-          "INSERT INTO users (id,email,password,credits) VALUES (?,?,?,30000)"
-        ).bind(id, email, password).run();
+          "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
+        ).bind(id, email, password, 30000).run();
 
         return new Response(JSON.stringify({ ok: true }), {
           headers: { ...headers, "Content-Type": "application/json" }
         });
 
       } catch (e) {
-        return new Response(JSON.stringify({ error: "signup failed" }), {
+        return new Response(JSON.stringify({ ok: false, error: e.message }), {
           status: 500,
           headers
         });
@@ -44,7 +52,7 @@ export default {
         const { email, password } = await req.json();
 
         const user = await env.DB.prepare(
-          "SELECT * FROM users WHERE email=? AND password=?"
+          "SELECT * FROM users WHERE email = ? AND password = ?"
         ).bind(email, password).first();
 
         if (!user) {
@@ -54,15 +62,15 @@ export default {
           });
         }
 
-        return new Response(JSON.stringify({ ok: true, uid: user.id }), {
-          headers: {
-            ...headers,
-            "Content-Type": "application/json"
-          }
+        return new Response(JSON.stringify({
+          ok: true,
+          uid: user.id
+        }), {
+          headers: { ...headers, "Content-Type": "application/json" }
         });
 
       } catch (e) {
-        return new Response(JSON.stringify({ error: "login failed" }), {
+        return new Response(JSON.stringify({ ok: false, error: e.message }), {
           status: 500,
           headers
         });
@@ -71,24 +79,33 @@ export default {
 
     // ================= USER =================
     if (url.pathname === "/user") {
-      const uid = url.searchParams.get("uid");
+      try {
+        const uid = url.searchParams.get("uid");
 
-      if (!uid) {
-        return new Response(JSON.stringify({ error: "no uid" }), {
-          status: 401,
+        if (!uid) {
+          return new Response(JSON.stringify({ error: "no uid" }), {
+            status: 401,
+            headers
+          });
+        }
+
+        const user = await env.DB.prepare(
+          "SELECT id, email, credits FROM users WHERE id = ?"
+        ).bind(uid).first();
+
+        return new Response(JSON.stringify({ user }), {
+          headers: { ...headers, "Content-Type": "application/json" }
+        });
+
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
           headers
         });
       }
-
-      const user = await env.DB.prepare(
-        "SELECT id,email,credits FROM users WHERE id=?"
-      ).bind(uid).first();
-
-      return new Response(JSON.stringify({ user }), {
-        headers: { ...headers, "Content-Type": "application/json" }
-      });
     }
 
-    return new Response("ok", { headers });
+    // ================= DEFAULT =================
+    return new Response("MoraAI API running", { headers });
   }
 };
