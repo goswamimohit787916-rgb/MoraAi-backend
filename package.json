@@ -1,7 +1,0 @@
-{
-  "name": "mora-api",
-  "version": "1.0.0",
-  "dependencies": {
-    "wrangler": "^3.0.0"
-  }
-}
