@@ -5,4 +5,4 @@ compatibility_date = "2025-03-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "voice-d1"
-database_id = "YOUR_D1_ID_HERE"   # ← get from wrangler d1 list
+database_id = "70869738-3761-479c-86fc-908d66acf81c"   # ← get from wrangler d1 list
