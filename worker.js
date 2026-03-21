@@ -1,11 +1,11 @@
 export default {
   async fetch(req, env) {
 
+    // 🔥 TEMP SAFE CORS (no credentials issues)
     const headers = {
-      "Access-Control-Allow-Origin": "https://moraai.pages.dev",
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "*",
-      "Access-Control-Allow-Methods": "*",
-      "Access-Control-Allow-Credentials": "true"
+      "Access-Control-Allow-Methods": "*"
     };
 
     // CORS preflight
@@ -17,57 +17,69 @@ export default {
 
     // ================= SIGNUP =================
     if (url.pathname === "/signup") {
-      const { email, password } = await req.json();
+      try {
+        const { email, password } = await req.json();
 
-      const id = "user_" + Date.now();
+        const id = "user_" + Date.now();
 
-      await env.DB.prepare(
-        "INSERT INTO users (id,email,password,credits) VALUES (?,?,?,30000)"
-      ).bind(id, email, password).run();
+        await env.DB.prepare(
+          "INSERT INTO users (id,email,password,credits) VALUES (?,?,?,30000)"
+        ).bind(id, email, password).run();
 
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...headers, "Content-Type": "application/json" }
-      });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...headers, "Content-Type": "application/json" }
+        });
+
+      } catch (e) {
+        return new Response(JSON.stringify({ error: "signup failed" }), {
+          status: 500,
+          headers
+        });
+      }
     }
 
     // ================= LOGIN =================
     if (url.pathname === "/login") {
-      const { email, password } = await req.json();
+      try {
+        const { email, password } = await req.json();
 
-      const user = await env.DB.prepare(
-        "SELECT * FROM users WHERE email=? AND password=?"
-      ).bind(email, password).first();
+        const user = await env.DB.prepare(
+          "SELECT * FROM users WHERE email=? AND password=?"
+        ).bind(email, password).first();
 
-      if (!user) {
-        return new Response(JSON.stringify({ ok: false }), {
+        if (!user) {
+          return new Response(JSON.stringify({ ok: false }), {
+            status: 401,
+            headers
+          });
+        }
+
+        return new Response(JSON.stringify({ ok: true, uid: user.id }), {
+          headers: {
+            ...headers,
+            "Content-Type": "application/json"
+          }
+        });
+
+      } catch (e) {
+        return new Response(JSON.stringify({ error: "login failed" }), {
+          status: 500,
+          headers
+        });
+      }
+    }
+
+    // ================= USER =================
+    if (url.pathname === "/user") {
+      const uid = url.searchParams.get("uid");
+
+      if (!uid) {
+        return new Response(JSON.stringify({ error: "no uid" }), {
           status: 401,
           headers
         });
       }
 
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-          // 🔥 FIXED COOKIE
-          "Set-Cookie": `uid=${user.id}; Path=/; HttpOnly`
-        }
-      });
-    }
-
-    // ================= AUTH =================
-    const cookie = req.headers.get("Cookie") || "";
-    const uid = cookie.split("uid=")[1]?.split(";")[0];
-
-    if (!uid) {
-      return new Response(JSON.stringify({ error: "no auth" }), {
-        status: 401,
-        headers
-      });
-    }
-
-    // ================= USER =================
-    if (url.pathname === "/user") {
       const user = await env.DB.prepare(
         "SELECT id,email,credits FROM users WHERE id=?"
       ).bind(uid).first();
