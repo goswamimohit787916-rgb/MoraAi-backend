@@ -13,24 +13,46 @@ export default {
 
     const url = new URL(req.url);
 
+    // 🔧 SAFE BODY PARSER
+    async function getBody(req) {
+      try {
+        const text = await req.text();
+        if (!text) return {};
+        return JSON.parse(text);
+      } catch {
+        return {};
+      }
+    }
+
     // ========= SIGNUP =========
     if (url.pathname === "/signup") {
-      let data = JSON.parse(await req.text() || "{}");
+      const data = await getBody(req);
 
-      const id = "user_" + Date.now();
+      if (!data.email || !data.password) {
+        return new Response(JSON.stringify({ ok: false }), { headers });
+      }
 
-      await env.DB.prepare(
-        "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
-      ).bind(id, data.email, data.password, 30000).run();
+      try {
+        const id = "user_" + Date.now();
 
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...headers, "Content-Type": "application/json" }
-      });
+        await env.DB.prepare(
+          "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
+        ).bind(id, data.email, data.password, 30000).run();
+
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...headers, "Content-Type": "application/json" }
+        });
+
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: e.message }), {
+          headers
+        });
+      }
     }
 
     // ========= LOGIN =========
     if (url.pathname === "/login") {
-      let data = JSON.parse(await req.text() || "{}");
+      const data = await getBody(req);
 
       const user = await env.DB.prepare(
         "SELECT * FROM users WHERE email=? AND password=?"
@@ -63,7 +85,7 @@ export default {
 
     // ========= SAVE VOICE =========
     if (url.pathname === "/save-voice") {
-      let data = JSON.parse(await req.text() || "{}");
+      const data = await getBody(req);
 
       const id = "voice_" + Date.now();
 
@@ -80,15 +102,15 @@ export default {
     if (url.pathname === "/voices") {
       const uid = url.searchParams.get("uid");
 
-      const voices = await env.DB.prepare(
+      const result = await env.DB.prepare(
         "SELECT id,name FROM voices WHERE user_id=?"
       ).bind(uid).all();
 
-      return new Response(JSON.stringify({ voices }), {
+      return new Response(JSON.stringify({ voices: result.results }), {
         headers: { ...headers, "Content-Type": "application/json" }
       });
     }
 
-    return new Response("MoraAI API", { headers });
+    return new Response("MoraAI API running", { headers });
   }
 };
