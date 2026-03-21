@@ -8,13 +8,14 @@ export default {
       "Access-Control-Allow-Credentials": "true"
     };
 
+    // CORS preflight
     if (req.method === "OPTIONS") {
       return new Response(null, { headers });
     }
 
     const url = new URL(req.url);
 
-    // SIGNUP
+    // ================= SIGNUP =================
     if (url.pathname === "/signup") {
       const { email, password } = await req.json();
 
@@ -29,7 +30,7 @@ export default {
       });
     }
 
-    // LOGIN
+    // ================= LOGIN =================
     if (url.pathname === "/login") {
       const { email, password } = await req.json();
 
@@ -48,12 +49,13 @@ export default {
         headers: {
           ...headers,
           "Content-Type": "application/json",
-          "Set-Cookie": `uid=${user.id}; Path=/; SameSite=None; Secure`
+          // 🔥 FIXED COOKIE
+          "Set-Cookie": `uid=${user.id}; Path=/; HttpOnly`
         }
       });
     }
 
-    // AUTH
+    // ================= AUTH =================
     const cookie = req.headers.get("Cookie") || "";
     const uid = cookie.split("uid=")[1]?.split(";")[0];
 
@@ -64,7 +66,7 @@ export default {
       });
     }
 
-    // USER
+    // ================= USER =================
     if (url.pathname === "/user") {
       const user = await env.DB.prepare(
         "SELECT id,email,credits FROM users WHERE id=?"
