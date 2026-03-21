@@ -14,57 +14,66 @@ export default {
 
     const url = new URL(req.url);
 
-    async function safeBody(req) {
+    // 🔧 SAFE BODY PARSER
+    async function getBody(req) {
       try {
-        const t = await req.text();
-        return t ? JSON.parse(t) : {};
+        const text = await req.text();
+        return text ? JSON.parse(text) : {};
       } catch {
         return {};
       }
     }
 
-    // ========= SIGNUP =========
+    // ================= SIGNUP =================
     if (url.pathname === "/signup") {
-      try {
-        const data = await safeBody(req);
+      const data = await getBody(req);
 
-        if (!data.email || !data.password) {
-          return new Response(JSON.stringify({ ok: false, error: "missing" }), { headers });
+      if (!data.email || !data.password) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: "missing data"
+        }), { headers });
+      }
+
+      try {
+        // 🔥 CHECK EXISTING USER
+        const existing = await env.DB.prepare(
+          "SELECT * FROM users WHERE email=?"
+        ).bind(data.email).first();
+
+        if (existing) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error: "User already exists"
+          }), { headers });
         }
 
         const id = "user_" + Date.now();
 
-        // 🔥 IMPORTANT: no await freeze risk
-        await Promise.race([
-          env.DB.prepare(
-            "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
-          ).bind(id, data.email, data.password, 30000).run(),
-          new Promise((_, reject) => setTimeout(() => reject("timeout"), 3000))
-        ]);
+        await env.DB.prepare(
+          "INSERT INTO users (id, email, password, credits) VALUES (?, ?, ?, ?)"
+        ).bind(id, data.email, data.password, 30000).run();
 
         return new Response(JSON.stringify({ ok: true }), { headers });
 
       } catch (e) {
         return new Response(JSON.stringify({
           ok: false,
-          error: String(e)
+          error: e.message
         }), { headers });
       }
     }
 
-    // ========= LOGIN =========
+    // ================= LOGIN =================
     if (url.pathname === "/login") {
+      const data = await getBody(req);
+
       try {
-        const data = await safeBody(req);
+        const user = await env.DB.prepare(
+          "SELECT * FROM users WHERE email=? ORDER BY rowid DESC LIMIT 1"
+        ).bind(data.email).first();
 
-        const user = await Promise.race([
-          env.DB.prepare(
-            "SELECT * FROM users WHERE email=? AND password=?"
-          ).bind(data.email, data.password).first(),
-          new Promise((_, reject) => setTimeout(() => reject("timeout"), 3000))
-        ]);
-
-        if (!user) {
+        if (!user || user.password !== data.password) {
           return new Response(JSON.stringify({ ok: false }), { headers });
         }
 
@@ -76,16 +85,16 @@ export default {
       } catch (e) {
         return new Response(JSON.stringify({
           ok: false,
-          error: String(e)
+          error: e.message
         }), { headers });
       }
     }
 
-    // ========= USER =========
+    // ================= USER =================
     if (url.pathname === "/user") {
-      try {
-        const uid = url.searchParams.get("uid");
+      const uid = url.searchParams.get("uid");
 
+      try {
         const user = await env.DB.prepare(
           "SELECT id,email,credits FROM users WHERE id=?"
         ).bind(uid).first();
@@ -93,7 +102,50 @@ export default {
         return new Response(JSON.stringify({ user }), { headers });
 
       } catch (e) {
-        return new Response(JSON.stringify({ error: String(e) }), { headers });
+        return new Response(JSON.stringify({
+          error: e.message
+        }), { headers });
+      }
+    }
+
+    // ================= SAVE VOICE =================
+    if (url.pathname === "/save-voice") {
+      const data = await getBody(req);
+
+      try {
+        const id = "voice_" + Date.now();
+
+        await env.DB.prepare(
+          "INSERT INTO voices (id, user_id, name, pth_base64) VALUES (?, ?, ?, ?)"
+        ).bind(id, data.uid, data.name, data.pth).run();
+
+        return new Response(JSON.stringify({ ok: true }), { headers });
+
+      } catch (e) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: e.message
+        }), { headers });
+      }
+    }
+
+    // ================= GET VOICES =================
+    if (url.pathname === "/voices") {
+      const uid = url.searchParams.get("uid");
+
+      try {
+        const result = await env.DB.prepare(
+          "SELECT id,name FROM voices WHERE user_id=?"
+        ).bind(uid).all();
+
+        return new Response(JSON.stringify({
+          voices: result.results
+        }), { headers });
+
+      } catch (e) {
+        return new Response(JSON.stringify({
+          error: e.message
+        }), { headers });
       }
     }
 
