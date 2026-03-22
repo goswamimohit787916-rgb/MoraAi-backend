@@ -1,0 +1,8 @@
+name = "voice-backend"
+main = "index.js"
+compatibility_date = "2025-03-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "voice-d1"
+database_id = "YOUR_D1_ID"   # ← get from wrangler d1 list
