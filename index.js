@@ -17,7 +17,7 @@ export default {
       catch { return {}; }
     }
 
-    // ---------- SIGNUP ----------
+    // SIGNUP
     if (url.pathname === "/signup") {
       const d = await body(req);
       const id = "user_" + Date.now();
@@ -29,7 +29,7 @@ export default {
       return new Response(JSON.stringify({ ok:true }), { headers });
     }
 
-    // ---------- LOGIN ----------
+    // LOGIN
     if (url.pathname === "/login") {
       const d = await body(req);
 
@@ -47,7 +47,7 @@ export default {
       }), { headers });
     }
 
-    // ---------- USER ----------
+    // USER
     if (url.pathname === "/user") {
       const uid = url.searchParams.get("uid");
 
@@ -58,7 +58,7 @@ export default {
       return new Response(JSON.stringify({ user }), { headers });
     }
 
-    // ---------- GENERATE ----------
+    // GENERATE
     if (url.pathname === "/generate") {
       const d = await body(req);
 
@@ -86,7 +86,7 @@ export default {
       }), { headers });
     }
 
-    // ---------- VERIFY PAYMENT ----------
+    // PAYMENT
     if (url.pathname === "/verify-payment") {
       const d = await body(req);
 
