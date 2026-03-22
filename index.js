@@ -1,20 +1,128 @@
 export default {
   async fetch(req, env) {
+
+    const headers = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Allow-Methods": "*",
+      "Content-Type": "application/json"
+    };
+
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers });
+    }
+
     const url = new URL(req.url);
-    const cors = { headers: { "Access-Control-Allow-Origin": "*" } };
 
-    if (url.pathname === "/generate" && req.method === "POST") {
-      const { text } = await req.json();
-      // TODO: connect Lightning AI here later
-      return Response.json({ audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3" }, cors);
+    async function body(req){
+      try {
+        const t = await req.text();
+        return t ? JSON.parse(t) : {};
+      } catch {
+        return {};
+      }
     }
 
-    if (url.pathname === "/clone-voice" && req.method === "POST") {
-      // Saves .pth metadata to D1
-      await env.DB.prepare("INSERT OR REPLACE INTO voice_clones (email, pth_file) VALUES (?, ?)").bind("john@example.com", "cloned.pth").run();
-      return Response.json({ success: true }, cors);
+    // SIGNUP (single email only)
+    if (url.pathname === "/signup") {
+
+      const d = await body(req);
+
+      if (!d.email || !d.password) {
+        return new Response(JSON.stringify({ ok:false, error:"Missing fields" }), { headers });
+      }
+
+      const exist = await env.DB.prepare(
+        "SELECT * FROM users WHERE email=?"
+      ).bind(d.email).first();
+
+      if (exist) {
+        return new Response(JSON.stringify({ ok:false, error:"Email exists" }), { headers });
+      }
+
+      const id = "user_" + Date.now();
+
+      await env.DB.prepare(
+        "INSERT INTO users VALUES (?,?,?,?)"
+      ).bind(id, d.email, d.password, 15000).run();
+
+      return new Response(JSON.stringify({ ok:true }), { headers });
     }
 
-    return new Response("OK", cors);
+    // LOGIN
+    if (url.pathname === "/login") {
+
+      const d = await body(req);
+
+      const user = await env.DB.prepare(
+        "SELECT * FROM users WHERE email=?"
+      ).bind(d.email).first();
+
+      if (!user || user.password !== d.password) {
+        return new Response(JSON.stringify({ ok:false, error:"Invalid login" }), { headers });
+      }
+
+      return new Response(JSON.stringify({ ok:true, uid:user.id }), { headers });
+    }
+
+    // USER
+    if (url.pathname === "/user") {
+
+      const uid = url.searchParams.get("uid");
+
+      const user = await env.DB.prepare(
+        "SELECT * FROM users WHERE id=?"
+      ).bind(uid).first();
+
+      return new Response(JSON.stringify({ user }), { headers });
+    }
+
+    // GENERATE
+    if (url.pathname === "/generate") {
+
+      const d = await body(req);
+
+      if (!d.uid) {
+        return new Response(JSON.stringify({ ok:false, error:"Login required" }), { headers });
+      }
+
+      const user = await env.DB.prepare(
+        "SELECT * FROM users WHERE id=?"
+      ).bind(d.uid).first();
+
+      if (!d.text || !d.text.trim()) {
+        return new Response(JSON.stringify({ ok:false, error:"Enter text" }), { headers });
+      }
+
+      const cost = d.text.length;
+
+      if (user.credits < cost) {
+        return new Response(JSON.stringify({ ok:false, error:"No credits" }), { headers });
+      }
+
+      await env.DB.prepare(
+        "UPDATE users SET credits=credits-? WHERE id=?"
+      ).bind(cost, d.uid).run();
+
+      return new Response(JSON.stringify({
+        ok:true,
+        audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        remaining:user.credits - cost
+      }), { headers });
+    }
+
+    // PAYMENT (simple add credits)
+    if (url.pathname === "/upgrade") {
+
+      const d = await body(req);
+
+      await env.DB.prepare(
+        "UPDATE users SET credits=credits+50000 WHERE id=?"
+      ).bind(d.uid).run();
+
+      return new Response(JSON.stringify({ ok:true }), { headers });
+    }
+
+    return new Response("OK", { headers });
   }
 };
