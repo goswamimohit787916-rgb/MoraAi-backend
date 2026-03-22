@@ -1,8 +1,6 @@
-name = "voice-backend"
-main = "index.js"
-compatibility_date = "2025-03-01"
+name = "ai-tts-voice-clone-worker"
+main = "src/index.ts"
+compatibility_date = "2026-03-01"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "voice-d1"
-database_id = "YOUR_D1_ID"   # ← get from wrangler d1 list
+# Optional: custom domain later
+# routes = [{ pattern = "tts.yourdomain.com/*", custom_domain = true }]
